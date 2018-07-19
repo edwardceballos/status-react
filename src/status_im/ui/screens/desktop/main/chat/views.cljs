@@ -23,7 +23,7 @@
                                    :as current-chat}]
   (views/letsubs [photo-path        [:get-chat-photo chat-id]
                   chat-name         [:get-current-chat-name]
-                  {:keys [pending?]} [:get-current-chat-contact]]
+                  {:keys [pending? whisper-identity]} [:get-current-chat-contact]]
     [react/view {:style styles/toolbar-chat-view}
      [react/view {:style {:flex-direction :row
                           :flex 1}}
@@ -37,10 +37,9 @@
        [react/text {:style styles/chat-title}
         chat-name]
        (cond pending?
-             [react/touchable-highlight
-              {:on-press #(re-frame/dispatch [:add-pending-contact chat-id])}
-              [react/text {:style styles/add-contact-text}
-               (i18n/label :t/add-to-contacts)]]
+             [react/text {:style styles/add-contact-text
+                          :on-press #(re-frame/dispatch [:add-contact whisper-identity])}
+              (i18n/label :t/add-to-contacts)]
              public?
              [react/text {:style styles/public-chat-text}
               (i18n/label :t/public-chat)])]]
