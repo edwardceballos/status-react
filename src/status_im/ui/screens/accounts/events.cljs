@@ -155,10 +155,12 @@
  (fn [cofx [_ dev-mode]]
    (accounts.utils/account-update {:dev-mode? dev-mode} cofx)))
 
-(defn wallet-set-up-passed [db cofx]
+(defn wallet-set-up-passed [db modal? cofx]
   (let [transaction (get-in db [:wallet :send-transaction])]
     (merge
-     {:db (navigation/navigate-back db)}
+     (if modal?
+       {:dispatch [:navigate-to-modal :wallet-send-transaction-modal]}
+       {:db (navigation/navigate-back db)})
      (when (and (seq transaction)
                 (not (:in-progress? transaction))
                 (:from-chat? transaction))
@@ -166,8 +168,8 @@
 
 (handlers/register-handler-fx
  :wallet-set-up-passed
- (fn [{:keys [db] :as cofx}]
+ (fn [{:keys [db] :as cofx} [_ modal?]]
    (handlers-macro/merge-fx
     cofx
-    (wallet-set-up-passed db)
+    (wallet-set-up-passed db modal?)
     (accounts.utils/account-update {:wallet-set-up-passed? true}))))

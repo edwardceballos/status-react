@@ -275,7 +275,7 @@
             scroll      (atom nil)]
     (if transaction
       [send-transaction-panel {:modal? true :transaction transaction :scroll scroll :advanced? advanced?
-                               symbol  symbol :network network}]
+                               :symbol  symbol :network network}]
       [react/view wallet.styles/wallet-modal-container
        [react/view components.styles/flex
         [status-bar/status-bar {:type :modal-wallet}]
