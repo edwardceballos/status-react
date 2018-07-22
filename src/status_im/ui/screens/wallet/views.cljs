@@ -11,9 +11,13 @@
             [status-im.ui.screens.wallet.styles :as styles]
             [status-im.ui.screens.wallet.utils :as wallet.utils]
             [status-im.utils.money :as money]
+            [status-im.ui.components.toolbar.actions :as action]
             status-im.ui.screens.wallet.collectibles.etheremon.views
             status-im.ui.screens.wallet.collectibles.cryptostrikers.views
-            status-im.ui.screens.wallet.collectibles.cryptokitties.views))
+            status-im.ui.screens.wallet.collectibles.cryptokitties.views
+            [status-im.ui.components.status-bar.view :as status-bar.view]
+            [status-im.ui.components.text :as text]
+            [status-im.ui.screens.wallet.transactions.views :as transactions.views]))
 
 (defn toolbar-view []
   [toolbar/toolbar {:style styles/toolbar :flat? true}
@@ -25,6 +29,17 @@
                   :accessibility-label :options-menu-button}
       :options   [{:label  (i18n/label :t/wallet-manage-assets)
                    :action #(re-frame/dispatch [:navigate-to-modal :wallet-settings-assets])}]}]]])
+
+(defn toolbar-modal [modal-history?]
+  [react/view
+   [status-bar.view/status-bar {:type :modal-wallet}]
+   [toolbar/toolbar {:style styles/toolbar :flat? true}
+    [toolbar/nav-button (action/close-white action/default-handler)]
+    [toolbar/content-wrapper]
+    [toolbar/actions
+     [{:icon      (if modal-history? :icons/wallet :icons/transaction-history)
+       :icon-opts {:color :white}
+       :handler #(re-frame/dispatch [:set-in [:wallet :modal-history?] (not modal-history?)])}]]]])
 
 (defn- total-section [value currency]
   [react/view styles/section
@@ -83,7 +98,7 @@
         [react/text {:style           styles/asset-item-price
                      :uppercase?      true
                      :number-of-lines 1}
-         (if @asset-value @asset-value "...")]]])))
+         (or @asset-value "...")]]])))
 
 (def item-icon-forward
   [list/item-icon {:icon      :icons/forward
@@ -130,33 +145,46 @@
                              :data      nfts
                              :render-fn #(render-collectible address-hex %)}]}]]))
 
-(views/defview wallet-root []
+(views/defview wallet-root [modal?]
   (views/letsubs [assets          [:wallet/visible-assets-with-amount]
                   currency        [:wallet/currency]
                   portfolio-value [:portfolio-value]
+                  {:keys [modal-history?]} [:get :wallet]
                   {:keys [seed-backed-up?]} [:get-current-account]
                   address-hex     [:get-current-account-hex]]
     [react/view styles/main-section
-     [toolbar-view]
-     [react/scroll-view {:refresh-control
-                         (reagent/as-element
-                          [react/refresh-control {:on-refresh #(re-frame/dispatch [:update-wallet])
-                                                  :tint-color :white
-                                                  :refreshing false}])}
-      [total-section portfolio-value currency]
-      (when (and (not seed-backed-up?)
-                 (some (fn [{:keys [amount]}]
-                         (and amount (not (.isZero amount))))
-                       assets))
-        [backup-seed-phrase])
-      [list/action-list actions
-       {:container-style styles/action-section}]
-      [asset-section assets currency address-hex]
-      ;; Hack to allow different colors for bottom scroll view (iOS only)
-      [react/view {:style styles/scroll-bottom}]]]))
+     (if modal?
+       [toolbar-modal modal-history?]
+       [toolbar-view])
+     (if (and modal? modal-history?)
+       [react/view styles/modal-history
+        [transactions.views/history-list true]]
+       [react/scroll-view {:refresh-control
+                           (reagent/as-element
+                            [react/refresh-control {:on-refresh #(re-frame/dispatch [:update-wallet])
+                                                    :tint-color :white
+                                                    :refreshing false}])}
+        [total-section portfolio-value currency]
+        (when (and (not modal?)
+                   (not seed-backed-up?)
+                   (some (fn [{:keys [amount]}]
+                           (and amount (not (.isZero amount))))
+                         assets))
+          [backup-seed-phrase])
+        (if modal?
+          [react/view styles/address-section
+           [text/selectable-text {:value address-hex :style styles/wallet-address}]]
+          [list/action-list actions
+           {:container-style styles/action-section}])
+        [asset-section assets currency address-hex]
+        ;; Hack to allow different colors for bottom scroll view (iOS only)
+        [react/view {:style styles/scroll-bottom}]])]))
+
+(views/defview wallet-modal []
+  [wallet-root true])
 
 (views/defview wallet []
   (views/letsubs [{:keys [wallet-set-up-passed?]} [:get-current-account]]
     (if (not wallet-set-up-passed?)
       [onboarding.views/onboarding]
-      [wallet-root])))
+      [wallet-root false])))
